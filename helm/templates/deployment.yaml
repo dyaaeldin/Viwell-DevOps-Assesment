@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deployment
+  labels:
+    {{- include "demo.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "demo.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "demo.selectorLabels" . | nindent 8 }}
+    spec: 
+      imagePullSecrets: 
+        - name: {{ .Values.imagePullSecrets }}
+      serviceAccountName: {{ include "demo.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{ if or (eq .Values.persistence.enabled "true") (.Files.Glob "properties") }}
+      volumes:
+      {{- if eq .Values.persistence.enabled "true" }}
+      {{- range .Values.persistence.volumes }} 
+        - name: {{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ $.Release.Name }}-{{ .name }}-volume
+      {{- end }}
+      {{- end }}      
+      {{- end }}
+      {{ if .Files.Glob "properties" }}
+        - name: properties
+          configMap:
+            name: {{ .Release.Name }}-properties-cm 
+      {{ end }}
+      {{- if eq .Values.init.useInitContainers "true" }}
+      initContainers: {{ .Values.init.initContainers | toYaml | nindent 12 }}
+      {{- end }}
+      {{- if eq .Values.useHostAliases true }}
+      hostAliases: {{ .Values.hostAliases | toYaml | nindent 6 }}
+      {{- end }}      
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- if .Values.appEnvs }}
+            {{- range $key, $value := .Values.appEnvs }}
+            - name: {{ $key }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $.Release.Name }}-configmap
+                  key: {{ $key | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.appSecrets }}
+            {{- range $key, $value := .Values.appSecrets }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Release.Name }}-secret
+                  key: {{ $key | quote }}
+            {{- end }}
+            {{- end }}            
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          {{- if .Values.probeEnabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.livenessProbe.httpGet.port }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.readinessProbe.httpGet.port }}
+          {{- end }}
+          #livenessProbe:
+          #  httpGet:
+          #    path: /
+          #    port: http
+          #readinessProbe:
+          #  httpGet:
+          #    path: /
+          #    port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{ if or (eq .Values.persistence.enabled "true") (.Files.Glob "properties") }}
+          volumeMounts:
+          {{- if eq .Values.persistence.enabled "true" }}
+          {{- range .Values.persistence.volumes }}
+          - name: {{ .name }}
+            mountPath: {{ .mountPath }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+          {{ if .Files.Glob "properties" }}
+          - name: properties
+            mountPath: {{ .Values.persistence.properties.path }}
+          {{ end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

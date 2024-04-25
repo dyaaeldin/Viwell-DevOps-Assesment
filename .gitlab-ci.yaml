@@ -1,0 +1,21 @@
+stages:
+  - build
+  - deploy
+
+before_script:
+  - docker login -u "$QUAY_USERNAME" -p "$QUAY_PASSWORD" quay.io
+
+build:
+  stage: build
+  script:
+    - mvn clean install
+    - docker build -t quay.io/dyaaeldin/countries:v1.0.1 .
+    - docker push quay.io/dyaaeldin/countries:v1.0.1
+
+deploy:
+  stage: deploy
+  script:
+    - helm upgrade --install countries ./helm --set image.repository=quay.io/dyaaeldin/countries,image.tag=v1.0.1
+  only:
+    - master
+

@@ -1,0 +1,19 @@
+{{- if eq .Values.persistence.enabled "true" }}
+{{- range .Values.persistence.volumes }}
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ $.Release.Name }}-{{ .name }}-volume
+  annotations:
+    # keep the pvc while uninstalling the release
+    "helm.sh/resource-policy": keep
+spec:
+  storageClassName: {{ .storageClass | quote}}
+  accessModes: 
+    - {{ .accessModes | quote }}
+  resources:
+    requests:
+      storage: {{ .size | quote }}
+{{- end }}
+{{- end }}

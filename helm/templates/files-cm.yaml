@@ -1,0 +1,10 @@
+{{- $prop := .Files.Get "properties" }}
+{{ if $prop }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-properties-cm
+data:
+  application.properties: |-
+{{ $prop | indent 4 }}
+{{ end }}

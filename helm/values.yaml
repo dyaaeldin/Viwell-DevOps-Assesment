@@ -1,0 +1,107 @@
+
+## Define the application name 
+application:
+  name: country
+
+replicaCount: 1
+
+appEnvs:
+appSecrets:
+
+init:
+  useInitContainers: "false"
+  initContainers:
+    - name: check mongo
+      image: busybox:1.28
+      command: ['sh', '-c', 'until nc -z -v -w5 192.168.1.5 28028; do inform "Waiting for MongoDB to start..."; sleep 5; done']
+
+image:
+  repository: quay.io/dyaaeldin/country
+  pullPolicy: Always
+  tag: "latest"
+
+imagePullSecrets: "regcred"
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: country.demo.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+    - secretName: tls-cert
+      hosts:
+        - country.demo.local
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 8048Mi
+  requests:
+    cpu: 2000m
+    memory: 2048Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+
+persistence:
+  enabled: "false"
+  volumes:
+    - name: volume1
+      mountPath: /mnt
+      pvcName: pvc1
+      size: 8Gi
+      accessModes: ReadWriteOnce
+      storageClass: "standard"
+
+probeEnabled: true
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+nodeSelector: 
+  env: demo
+
+tolerations: []
+
+affinity: {}
